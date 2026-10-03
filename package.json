@@ -1,0 +1,23 @@
+{
+  "name": "clusterdash",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Agentless SSH dashboard to manage, audit and open a console on your VPS fleet",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --env-file=.env server.js",
+    "dev:watch": "node --env-file=.env --watch server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
+    "better-sqlite3": "^13.0.2",
+    "express": "^4.21.2",
+    "ssh2": "^1.16.0",
+    "ws": "^8.18.0"
+  }
+}

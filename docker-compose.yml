@@ -1,0 +1,33 @@
+services:
+  clusterdash:
+    build: .
+    container_name: clusterdash
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Points at the mounted volume below. Overrides anything in .env so the
+      # same .env works both locally and in Docker.
+      DATA_DIR: /data
+    volumes:
+      # SQLite database: hosts, metric history, audit trail.
+      - ./data:/data
+    ports:
+      # Plain HTTP. If you enable the `caddy` profile below, change this to
+      # "127.0.0.1:8080:8080" so the app is only reachable through Caddy.
+      - "8080:8080"
+
+  # Optional automatic-HTTPS front door. Start with:
+  #   DOMAIN=dash.example.com docker compose --profile tls up -d
+  # Requires a DNS A record pointing at this VPS and ports 80/443 open.
+  caddy:
+    image: caddy:2-alpine
+    container_name: clusterdash-caddy
+    profiles: ["tls"]
+    restart: unless-stopped
+    depends_on: [clusterdash]
+    command: caddy reverse-proxy --from ${DOMAIN:?set DOMAIN} --to clusterdash:8080
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./data/caddy:/data

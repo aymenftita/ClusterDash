@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ClusterDash</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/vendor/xterm.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>🛰️</text></svg>">
+</head>
+<body>
+
+<!-- ------------------------------------------------------------- login -- -->
+<div id="login">
+  <form id="login-form">
+    <h1>ClusterDash</h1>
+    <p class="sub">Sign in to manage your fleet.</p>
+    <label>Username
+      <input name="username" autocomplete="username" required autofocus>
+    </label>
+    <label>Password
+      <input name="password" type="password" autocomplete="current-password" required>
+    </label>
+    <button class="primary" type="submit">Sign in</button>
+    <p id="login-error" class="sub hidden" style="color:var(--critical);margin-top:12px"></p>
+  </form>
+</div>
+
+<!-- --------------------------------------------------------------- app -- -->
+<div id="app" class="hidden">
+  <header class="top">
+    <div class="brand">ClusterDash <span id="poll-note"></span></div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-view="fleet" aria-selected="true">Fleet</button>
+      <button role="tab" data-view="sites" aria-selected="false">Sites</button>
+      <button role="tab" data-view="alerts" aria-selected="false">Alerts <span class="badge hidden" id="alert-badge"></span></button>
+      <button role="tab" data-view="audit" aria-selected="false">Audit</button>
+      <button role="tab" data-view="hosts" aria-selected="false">Hosts</button>
+      <button role="tab" data-view="settings" aria-selected="false">Settings</button>
+    </nav>
+    <div class="spacer"></div>
+    <span class="who" id="who"></span>
+    <button id="theme-toggle" title="Switch light / dark">Theme</button>
+    <button id="logout">Sign out</button>
+  </header>
+
+  <main>
+    <!-- ---------------------------------------------------------- fleet -- -->
+    <section class="view active" id="view-fleet">
+      <div class="panel">
+        <header>
+          <div>
+            <h3 id="fleet-title">CPU utilisation across the fleet</h3>
+            <p class="subtitle" id="fleet-range-note">Last 60 minutes, sampled over SSH.</p>
+          </div>
+          <div class="spacer"></div>
+          <select id="fleet-metric" style="width:auto" aria-label="Metric">
+            <option value="cpu" selected>CPU</option>
+            <option value="mem">Memory</option>
+            <option value="disk">Disk</option>
+            <option value="load1">Load average</option>
+          </select>
+          <select id="fleet-range" style="width:auto" aria-label="Time range">
+            <option value="30">Last 30 min</option>
+            <option value="60" selected>Last 60 min</option>
+            <option value="360">Last 6 hours</option>
+            <option value="1440">Last 24 hours</option>
+          </select>
+          <button id="fleet-table-toggle" aria-pressed="false">Table view</button>
+        </header>
+        <div class="chart-wrap" id="fleet-chart-wrap">
+          <svg id="fleet-chart" role="img" aria-label="Resource utilisation per host over time"></svg>
+        </div>
+        <div class="legend" id="fleet-legend"></div>
+        <div class="table-scroll hidden" id="fleet-table"></div>
+      </div>
+
+      <h2 class="section-title">Hosts</h2>
+      <div class="host-grid" id="host-grid"></div>
+    </section>
+
+    <!-- ---------------------------------------------------------- sites -- -->
+    <section class="view" id="view-sites">
+      <div class="panel">
+        <header>
+          <div>
+            <h3>Site monitors</h3>
+            <p class="subtitle">HTTP checks with response time and TLS expiry — "is the site up", not just "is the server up".</p>
+          </div>
+          <div class="spacer"></div>
+          <button class="primary" id="add-check">Add monitor</button>
+        </header>
+        <div id="checks-body"></div>
+      </div>
+    </section>
+
+    <!-- --------------------------------------------------------- alerts -- -->
+    <section class="view" id="view-alerts">
+      <div class="panel">
+        <header>
+          <div>
+            <h3>Alerts</h3>
+            <p class="subtitle">Open alerts first. Each one is delivered to WhatsApp when it opens and again when it clears.</p>
+          </div>
+          <div class="spacer"></div>
+          <button id="alerts-refresh">Refresh</button>
+        </header>
+        <div class="table-scroll" id="alerts-table"></div>
+      </div>
+    </section>
+
+    <!-- ---------------------------------------------------------- audit -- -->
+    <section class="view" id="view-audit">
+      <div class="panel">
+        <header>
+          <div>
+            <h3>Audit trail</h3>
+            <p class="subtitle">Every login, lifecycle action and console session, newest first.</p>
+          </div>
+          <div class="spacer"></div>
+          <input id="audit-search" placeholder="Filter…" style="width:180px">
+          <select id="audit-filter" style="width:auto"><option value="">All hosts</option></select>
+          <button id="audit-refresh">Refresh</button>
+          <a href="/api/audit.csv"><button>Export CSV</button></a>
+        </header>
+        <div class="table-scroll" id="audit-table"></div>
+      </div>
+
+      <div class="panel">
+        <header>
+          <div>
+            <h3>Console recordings</h3>
+            <p class="subtitle">Full transcripts of every shell and pod-exec session.</p>
+          </div>
+          <div class="spacer"></div>
+          <button id="rec-refresh">Load recordings</button>
+        </header>
+        <div class="table-scroll" id="rec-table"><p class="hint">Not loaded.</p></div>
+      </div>
+    </section>
+
+    <!-- ---------------------------------------------------------- hosts -- -->
+    <section class="view" id="view-hosts">
+      <div class="panel">
+        <header>
+          <div>
+            <h3>Registered hosts</h3>
+            <p class="subtitle">Credentials are encrypted with AES-256-GCM before they touch the database.</p>
+          </div>
+          <div class="spacer"></div>
+          <button class="primary" id="add-host">Add host</button>
+        </header>
+        <div class="table-scroll" id="hosts-table"></div>
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------------- settings -- -->
+    <section class="view" id="view-settings">
+      <div class="panel">
+        <header>
+          <div>
+            <h3>WhatsApp notifications</h3>
+            <p class="subtitle">Alerts and the daily report are delivered here.</p>
+          </div>
+          <div class="spacer"></div>
+          <button id="notify-test">Send test message</button>
+          <button id="report-preview">Preview daily report</button>
+        </header>
+        <div id="notify-body"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ------------------------------------------------------- host detail -- -->
+<div class="modal-backdrop hidden" id="detail-modal">
+  <div class="modal">
+    <header>
+      <h2 id="detail-title">Host</h2>
+      <span id="detail-status"></span>
+      <div class="spacer"></div>
+      <button id="detail-reboot">Reboot</button>
+      <button id="detail-close">Close</button>
+    </header>
+    <nav class="tabs subtabs" id="detail-tabs">
+      <button data-tab="overview" aria-selected="true">Overview</button>
+      <button data-tab="console" aria-selected="false">Console</button>
+      <button data-tab="services" aria-selected="false">Services</button>
+      <button data-tab="k8s" aria-selected="false" class="hidden">Kubernetes</button>
+    </nav>
+    <div id="detail-body"></div>
+  </div>
+</div>
+
+<!-- ----------------------------------------------------------- add host -- -->
+<div class="modal-backdrop hidden" id="add-modal">
+  <div class="modal narrow">
+    <header><h2>Add host</h2><div class="spacer"></div><button id="add-close">Close</button></header>
+    <form id="add-form">
+      <label>Display name
+        <input name="name" placeholder="k8s-master" required>
+      </label>
+      <div class="two-col">
+        <label>Host or IP
+          <input name="hostname" placeholder="203.0.113.10" required>
+        </label>
+        <label>SSH port
+          <input name="port" type="number" value="22" min="1" max="65535">
+        </label>
+      </div>
+      <div class="two-col">
+        <label>Username
+          <input name="username" value="root" required>
+        </label>
+        <label>Role
+          <select name="role">
+            <option value="master">k8s master</option>
+            <option value="worker">k8s worker</option>
+            <option value="standalone" selected>standalone</option>
+          </select>
+        </label>
+      </div>
+      <label>Provider <span style="color:var(--muted)">(optional, for your own reference)</span>
+        <input name="provider" placeholder="Hostinger">
+      </label>
+      <label>Root password
+        <input name="password" type="password" autocomplete="new-password" required>
+      </label>
+      <button class="primary" type="submit" style="width:100%">Add and test connection</button>
+    </form>
+  </div>
+</div>
+
+<!-- -------------------------------------------------------- add monitor -- -->
+<div class="modal-backdrop hidden" id="check-modal">
+  <div class="modal narrow">
+    <header><h2>Add monitor</h2><div class="spacer"></div><button id="check-close">Close</button></header>
+    <form id="check-form">
+      <label>Name
+        <input name="name" placeholder="Main site" required>
+      </label>
+      <label>URL
+        <input name="url" type="url" placeholder="https://example.com" required>
+      </label>
+      <div class="two-col">
+        <label>Expected status
+          <input name="expect_status" type="number" value="200" min="100" max="599">
+        </label>
+        <label>Keyword <span style="color:var(--muted)">(optional)</span>
+          <input name="keyword" placeholder="Welcome">
+        </label>
+      </div>
+      <p class="hint">A keyword check catches the case where the server returns 200 but renders an error page.</p>
+      <button class="primary" type="submit" style="width:100%">Add monitor</button>
+    </form>
+  </div>
+</div>
+
+<!-- ---------------------------------------------------------- pod logs -- -->
+<div class="modal-backdrop hidden" id="log-modal">
+  <div class="modal">
+    <header>
+      <h2 id="log-title">Logs</h2>
+      <div class="spacer"></div>
+      <select id="log-container" style="width:auto"></select>
+      <select id="log-tail" style="width:auto">
+        <option value="100">Last 100 lines</option>
+        <option value="200" selected>Last 200 lines</option>
+        <option value="1000">Last 1000 lines</option>
+      </select>
+      <button id="log-refresh">Refresh</button>
+      <button id="log-close">Close</button>
+    </header>
+    <pre id="log-output"></pre>
+  </div>
+</div>
+
+<!-- --------------------------------------------------------- transcript -- -->
+<div class="modal-backdrop hidden" id="rec-modal">
+  <div class="modal">
+    <header>
+      <h2 id="rec-title">Console transcript</h2>
+      <div class="spacer"></div>
+      <button id="rec-close">Close</button>
+    </header>
+    <pre id="rec-output"></pre>
+  </div>
+</div>
+
+<!-- ------------------------------------------------------- report text -- -->
+<div class="modal-backdrop hidden" id="report-modal">
+  <div class="modal narrow">
+    <header>
+      <h2>Daily report preview</h2>
+      <div class="spacer"></div>
+      <button id="report-send">Send now</button>
+      <button id="report-close">Close</button>
+    </header>
+    <pre id="report-output"></pre>
+  </div>
+</div>
+
+<script src="/vendor/xterm.js"></script>
+<script src="/vendor/xterm-fit.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
